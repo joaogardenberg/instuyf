@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Instuyf de Spuyt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = { darkMode: 'media' }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React
+
+      // ─── Helpers ────────────────────────────────────────────────────────────────
+
+      function getNextMonday(from) {
+        const d = new Date(from)
+        const day = d.getDay()
+        const diff = (1 - day + 7) % 7 || 7
+        d.setDate(d.getDate() + diff)
+        d.setHours(20, 0, 0, 0)
+        return d
+      }
+
+      function getPreviousMonday(from) {
+        const d = new Date(from)
+        const day = d.getDay()
+        const diff = day === 1 ? 0 : day === 0 ? 6 : day - 1
+        d.setDate(d.getDate() - diff)
+        d.setHours(20, 0, 0, 0)
+        return d
+      }
+
+      function addWeeks(date, n) {
+        const d = new Date(date)
+        d.setDate(d.getDate() + n * 7)
+        return d
+      }
+
+      function sameDay(a, b) {
+        return (
+          a.getFullYear() === b.getFullYear() &&
+          a.getMonth() === b.getMonth() &&
+          a.getDate() === b.getDate()
+        )
+      }
+
+      function getEventLabel(date) {
+        const now = new Date()
+        const nextMonday =
+          now.getDay() === 1 ? getPreviousMonday(now) : getNextMonday(now)
+        if (sameDay(date, nextMonday)) return 'Next Event'
+        return 'Past Event'
+      }
+
+      function weekLabel(week) {
+        return (
+          'Mon ' +
+          week.eventDate.toLocaleDateString('en-NL', {
+            month: 'short',
+            day: 'numeric'
+          })
+        )
+      }
+
+      function formatEventDate(date) {
+        return date.toLocaleDateString('en-NL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+      }
+
+      // ─── Mock data ──────────────────────────────────────────────────────────────
+
+      function generateMockWeeks() {
+        const now = new Date()
+        const day = now.getDay()
+        const baseMonday =
+          day === 1 ? getPreviousMonday(now) : getNextMonday(now)
+        const pastMonday = addWeeks(baseMonday, -1)
+
+        return [
+          {
+            eventDate: pastMonday,
+            eventTime: '20:00',
+            locationName: 'Het Marnix',
+            locationUrl: 'https://maps.app.goo.gl/sHBzVpggqFpLVkbb6',
+            paymentUrl: 'https://tikkie.me/pay/example',
+            maxRegistrants: 14,
+            registrants: [
+              { name: 'Jan de Vries', paid: true },
+              { name: 'Sophie Bakker', paid: true },
+              { name: 'Thomas van den Berg', paid: true },
+              { name: 'Emma Visser', paid: true },
+              { name: 'Pieter Jansen', paid: true }
+            ]
+          },
+          {
+            eventDate: baseMonday,
+            eventTime: '20:00',
+            locationName: 'Het Marnix',
+            locationUrl: 'https://maps.app.goo.gl/sHBzVpggqFpLVkbb6',
+            paymentUrl: 'https://tikkie.me/pay/example',
+            maxRegistrants: 14,
+            registrants: [
+              { name: 'Jan de Vries', paid: false },
+              { name: 'Sophie Bakker', paid: false },
+              { name: 'Thomas van den Berg', paid: false },
+              { name: 'Emma Visser', paid: false }
+            ]
+          }
+        ]
+      }
+
+      // ─── Icons ──────────────────────────────────────────────────────────────────
+
+      function TrashIcon() {
+        return (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6" />
+            <path d="M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+        )
+      }
+
+      function LocationIcon() {
+        return (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+            <circle cx="12" cy="9" r="2.5" />
+          </svg>
+        )
+      }
+
+      function CreditCardIcon() {
+        return (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="2" y="6" width="20" height="13" rx="2" />
+            <path d="M2 10h20" />
+            <path d="M6 14h.01M10 14h4" />
+          </svg>
+        )
+      }
+
+      // ─── Components ─────────────────────────────────────────────────────────────
+
+      function RegistrantRow({
+        person,
+        index,
+        maxRegistrants,
+        isPast,
+        onTogglePaid,
+        onRemove
+      }) {
+        const isWaiting = index >= maxRegistrants
+        return (
+          <div
+            className={`flex items-center gap-3 border rounded-xl px-4 py-3 transition-colors ${
+              isWaiting
+                ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/30'
+                : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                isWaiting
+                  ? 'bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-300'
+                  : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              {index + 1}
+            </span>
+            <input
+              type="checkbox"
+              checked={person.paid}
+              onChange={onTogglePaid}
+              className="w-4 h-4 accent-green-500 cursor-pointer flex-shrink-0"
+              title={person.paid ? 'Mark as unpaid' : 'Mark as paid'}
+            />
+            <span
+              className={`flex-1 text-sm ${person.paid ? 'line-through opacity-50' : ''}`}
+            >
+              {person.name}
+            </span>
+            <button
+              onClick={onRemove}
+              title="Remove"
+              className={`text-red-400 hover:text-white dark:hover:text-red-100 hover:bg-red-500 rounded-md p-1.5 transition-all opacity-50 hover:opacity-100 ${isPast ? 'invisible' : 'visible'}`}
+            >
+              <TrashIcon />
+            </button>
+          </div>
+        )
+      }
+
+      function EventCard({ week, onUpdateWeek }) {
+        const [newName, setNewName] = useState('')
+        const [error, setError] = useState('')
+
+        const label = getEventLabel(week.eventDate)
+        const isPast = label === 'Past Event'
+        const isNext = label === 'Next Event'
+        const paidCount = week.registrants.filter((r) => r.paid).length
+        const waitingCount = Math.max(
+          0,
+          week.registrants.length - week.maxRegistrants
+        )
+
+        function handleAdd() {
+          const name = newName.trim()
+          if (!name) {
+            setError('Please enter a name.')
+            return
+          }
+          if (
+            week.registrants.some(
+              (r) => r.name.toLowerCase() === name.toLowerCase()
+            )
+          ) {
+            setError('This name is already on the list.')
+            return
+          }
+          onUpdateWeek({
+            ...week,
+            registrants: [...week.registrants, { name, paid: false }]
+          })
+          setNewName('')
+          setError('')
+        }
+
+        function handleRemove(i) {
+          onUpdateWeek({
+            ...week,
+            registrants: week.registrants.filter((_, idx) => idx !== i)
+          })
+        }
+
+        function handleTogglePaid(i) {
+          onUpdateWeek({
+            ...week,
+            registrants: week.registrants.map((r, idx) =>
+              idx === i ? { ...r, paid: !r.paid } : r
+            )
+          })
+        }
+
+        return (
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 mb-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-widest mb-0.5 ${label === 'Next Event' ? 'text-green-500' : 'text-red-400'}`}
+                >
+                  {label}
+                </p>
+                <p className="text-lg font-bold">
+                  {formatEventDate(week.eventDate)}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {week.eventTime}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={week.locationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="select-none inline-flex items-center gap-1.5 text-sm font-medium text-purple-800 dark:text-white bg-purple-100 dark:bg-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <LocationIcon />
+                  {week.locationName}
+                </a>
+                <a
+                  href={week.paymentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="select-none inline-flex items-center gap-1.5 text-sm font-medium text-green-800 dark:text-white bg-green-100 dark:bg-green-700 hover:bg-green-200 dark:hover:bg-green-800 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <CreditCardIcon />
+                  Tikkie
+                </a>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 my-4" />
+
+            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">
+              Registered:{' '}
+              <span className="font-bold text-gray-900 dark:text-gray-100">
+                {Math.min(week.registrants.length, week.maxRegistrants)} /{' '}
+                {week.maxRegistrants}
+              </span>
+              {paidCount > 0 && (
+                <span className="ml-2 text-green-500 font-medium">
+                  ({paidCount} paid)
+                </span>
+              )}
+              {waitingCount > 0 && (
+                <span className="ml-2 text-purple-500 font-medium">
+                  · {waitingCount} on waiting list
+                </span>
+              )}
+            </p>
+
+            <div className="flex flex-col gap-2 mb-4">
+              {week.registrants.length === 0 && (
+                <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-4">
+                  No registrations yet. Be the first!
+                </p>
+              )}
+              {week.registrants.flatMap((person, i) => {
+                const items = []
+                if (i === week.maxRegistrants) {
+                  items.push(
+                    <div
+                      key="waiting-divider"
+                      className="flex items-center gap-2 my-2"
+                    >
+                      <div className="flex-1 border-t border-dashed border-purple-400 dark:border-purple-600" />
+                      <span className="text-xs font-semibold text-purple-500 dark:text-purple-400 px-2">
+                        ⏳ Waiting list
+                      </span>
+                      <div className="flex-1 border-t border-dashed border-purple-400 dark:border-purple-600" />
+                    </div>
+                  )
+                }
+                items.push(
+                  <RegistrantRow
+                    key={i}
+                    person={person}
+                    index={i}
+                    maxRegistrants={week.maxRegistrants}
+                    isPast={isPast}
+                    onTogglePaid={() => handleTogglePaid(i)}
+                    onRemove={() => handleRemove(i)}
+                  />
+                )
+                return items
+              })}
+            </div>
+
+            {isPast && (
+              <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-2">
+                This event has already taken place.
+              </p>
+            )}
+            {isNext && (
+              <div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                    placeholder="Enter a name…"
+                    className="flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500 transition"
+                  />
+                  <button
+                    onClick={handleAdd}
+                    className="select-none flex-shrink-0 bg-purple-100 dark:bg-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-800 dark:text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
+                  >
+                    {week.registrants.length < week.maxRegistrants
+                      ? 'Register'
+                      : 'Waiting list'}
+                  </button>
+                </div>
+                {error && (
+                  <p className="text-red-500 text-xs mt-1.5">{error}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      function App() {
+        const [weeks, setWeeks] = useState(generateMockWeeks)
+        const [selectedWeek, setSelectedWeek] = useState(1)
+
+        function updateWeek(updatedWeek) {
+          setWeeks((prev) =>
+            prev.map((w, i) => (i === selectedWeek ? updatedWeek : w))
+          )
+        }
+
+        return (
+          <div className="min-h-screen bg-purple-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 py-8 px-4">
+            <div className="max-w-xl mx-auto mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Instuyf de Spuyt
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  Weekly registration list
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap mt-4 md:mt-0">
+                {weeks.map((week, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedWeek(idx)}
+                    className={`select-none border rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all ${
+                      idx === selectedWeek
+                        ? 'bg-purple-700 border-transparent text-white cursor-default'
+                        : 'cursor-pointer bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+                    }`}
+                  >
+                    {weekLabel(week)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="max-w-xl mx-auto">
+              <EventCard week={weeks[selectedWeek]} onUpdateWeek={updateWeek} />
+            </div>
+
+            <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-8">
+              Instuyf de Spuyt · No backend yet — data resets on reload.
+            </p>
+          </div>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+    </script>
+  </body>
+</html>
